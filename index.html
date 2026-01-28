@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Order Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; background: #f5f5f5; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { margin-bottom: 20px; color: #333; font-size: 24px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; font-size: 14px; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        textarea { resize: vertical; min-height: 60px; }
+        .product { background: #f9f9f9; padding: 15px; margin-bottom: 10px; border-radius: 4px; border-left: 3px solid #4CAF50; position: relative; }
+        .product-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .product-name { width: 100%; padding: 6px; font-weight: bold; margin-bottom: 10px; }
+        .product-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .product-row input { padding: 6px; }
+        .remove-btn { background: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .remove-btn:hover { background: #da190b; }
+        button { background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-right: 10px; margin-bottom: 10px; }
+        button:hover { background: #45a049; }
+        .btn-secondary { background: #2196F3; }
+        .btn-secondary:hover { background: #0b7dda; }
+        .btn-add { background: #FF9800; }
+        .btn-add:hover { background: #e68900; }
+        .output { margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 4px; display: none; }
+        .link-box { margin-top: 10px; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 4px; word-break: break-all; font-size: 12px; }
+        small { color: #666; display: block; margin-bottom: 3px; }
+        .actions { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Sales Order Tracker</h1>
+        
+        <div class="form-group">
+            <label>Shop/Customer Name</label>
+            <input type="text" id="shopName" placeholder="Enter name">
+        </div>
+        
+        <div class="form-group">
+            <label>Contact Number</label>
+            <input type="tel" id="contact" placeholder="Enter contact">
+        </div>
+        
+        <div class="form-group">
+            <label>GST Number (Optional)</label>
+            <input type="text" id="gstNo" placeholder="Enter GST number">
+        </div>
+        
+        <div class="form-group">
+            <label>Address</label>
+            <textarea id="address" placeholder="Enter address"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>Location (Optional)</label>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button type="button" class="btn-secondary" onclick="getCurrentLocation()" style="flex: 1;">📍 Use Current Location</button>
+                <button type="button" class="btn-secondary" onclick="window.open('https://www.google.com/maps', '_blank')" style="flex: 1;">🗺️ Pick on Maps</button>
+            </div>
+            <input type="url" id="mapLink" placeholder="Or paste Google Maps link" oninput="updateMapPreview()">
+            <small style="color: #888; margin-top: 5px;">Click "Use Current Location" or pick on Google Maps and paste link</small>
+        </div>
+        
+        <div id="mapPreview" style="display: none; margin-top: 10px;">
+            <iframe id="mapFrame" width="100%" height="300" style="border: 1px solid #ddd; border-radius: 4px;" loading="lazy"></iframe>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0 10px 0;">
+            <h3 style="margin: 0;">Products</h3>
+            <button class="btn-add" onclick="addProduct()">+ Add Product</button>
+        </div>
+        
+        <div id="products"></div>
+        
+        <div class="actions">
+            <button onclick="generateAndCopyLink()">Generate & Copy Link</button>
+            <button class="btn-secondary" onclick="loadFromURL()">Load from URL</button>
+            <button class="btn-secondary" onclick="copyToWhatsApp()">Copy for WhatsApp</button>
+            <button class="btn-secondary" onclick="resetPage()">Reset</button>
+        </div>
+        
+        <div class="output" id="output">
+            <h3>Link copied to clipboard!</h3>
+            <div class="link-box" id="linkBox"></div>
+        </div>
+    </div>
+
+    <script>
+        let productCount = 0;
+
+        const productCatalog = {
+            'Roll 79mm (55gsm, 60dia)': { price: '33', gst: '18' },
+            'Roll 57mm - 41dia (55gsm)': { price: '10.5', gst: '18' },
+            'Roll 57mm - 31dia (55gsm)': { price: '6.5', gst: '18' },
+            'Custom': { price: '', gst: '18' }
+        };
+
+        function addProduct(name = '', qty = '', price = '', gst = '18') {
+            const id = productCount++;
+            const div = document.createElement('div');
+            div.className = 'product';
+            div.id = `product-${id}`;
+            
+            const options = Object.keys(productCatalog).map(p => 
+                `<option value="${p}" ${p === name ? 'selected' : ''}>${p}</option>`
+            ).join('');
+            
+            div.innerHTML = `
+                <div class="product-header">
+                    <select class="product-name" data-id="${id}" onchange="updateProductPrice(${id})">
+                        ${options}
+                    </select>
+                    <button class="remove-btn" onclick="removeProduct(${id})">Remove</button>
+                </div>
+                <div class="product-row">
+                    <div><small>Quantity</small><input type="number" placeholder="0" value="${qty}" data-id="${id}" data-field="qty"></div>
+                    <div><small>Price (₹)</small><input type="number" step="0.01" placeholder="0" value="${price}" data-id="${id}" data-field="price"></div>
+                    <div><small>GST (%)</small><input type="number" placeholder="18" value="${gst}" data-id="${id}" data-field="gst"></div>
+                </div>
+            `;
+            document.getElementById('products').appendChild(div);
+            
+            if (!price) updateProductPrice(id);
+        }
+
+        function updateProductPrice(id) {
+            const select = document.querySelector(`select[data-id="${id}"]`);
+            const product = productCatalog[select.value];
+            if (product) {
+                document.querySelector(`input[data-id="${id}"][data-field="price"]`).value = product.price;
+                document.querySelector(`input[data-id="${id}"][data-field="gst"]`).value = product.gst;
+            }
+        }
+
+        function removeProduct(id) {
+            document.getElementById(`product-${id}`).remove();
+        }
+
+        function getFormData() {
+            const products = [];
+            document.querySelectorAll('.product').forEach(p => {
+                const id = p.querySelector('.product-name').dataset.id;
+                products.push({
+                    n: p.querySelector('.product-name').value,
+                    q: p.querySelector(`[data-id="${id}"][data-field="qty"]`).value,
+                    p: p.querySelector(`[data-id="${id}"][data-field="price"]`).value,
+                    g: p.querySelector(`[data-id="${id}"][data-field="gst"]`).value
+                });
+            });
+            
+            return {
+                s: document.getElementById('shopName').value,
+                c: document.getElementById('contact').value,
+                g: document.getElementById('gstNo').value,
+                a: document.getElementById('address').value,
+                m: document.getElementById('mapLink').value,
+                p: products
+            };
+        }
+
+        function generateAndCopyLink() {
+            const data = getFormData();
+            if (!data.s || data.p.length === 0) return;
+            
+            const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
+            const url = window.location.origin + window.location.pathname + '?d=' + encoded;
+            
+            navigator.clipboard.writeText(url);
+            document.getElementById('linkBox').textContent = url;
+            document.getElementById('output').style.display = 'block';
+        }
+
+        function loadFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const encoded = params.get('d');
+            if (!encoded) return;
+            
+            try {
+                const data = JSON.parse(decodeURIComponent(atob(encoded)));
+                document.getElementById('shopName').value = data.s || '';
+                document.getElementById('contact').value = data.c || '';
+                document.getElementById('gstNo').value = data.g || '';
+                document.getElementById('address').value = data.a || '';
+                document.getElementById('mapLink').value = data.m || '';
+                
+                document.getElementById('products').innerHTML = '';
+                productCount = 0;
+                
+                if (data.p && data.p.length > 0) {
+                    data.p.forEach(prod => {
+                        addProduct(prod.n || '', prod.q || '', prod.p || '', prod.g || '18');
+                    });
+                }
+                
+                updateMapPreview();
+            } catch (e) {
+                console.error('Error loading data:', e);
+            }
+        }
+
+        function copyLink() {
+            const link = document.getElementById('linkBox').textContent;
+            navigator.clipboard.writeText(link);
+        }
+
+        function copyToWhatsApp() {
+            const data = getFormData();
+            if (!data.s) return;
+            
+            // Generate shareable link
+            const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
+            const url = window.location.origin + window.location.pathname + '?d=' + encoded;
+            
+            let msg = `*Order Details*\n\nShop: ${data.s}\nContact: ${data.c}\n\n`;
+            
+            let grandTotal = 0;
+            data.p.forEach(prod => {
+                if (prod.q && prod.p) {
+                    const subtotal = parseFloat(prod.q) * parseFloat(prod.p);
+                    const gstAmount = subtotal * (parseFloat(prod.g) / 100);
+                    const total = subtotal + gstAmount;
+                    grandTotal += total;
+                    
+                    msg += `${prod.n}\nQty: ${prod.q} | Price: ₹${prod.p} + ${prod.g}% GST\nTotal: ₹${total.toFixed(2)}\n\n`;
+                }
+            });
+            
+            msg += `*Grand Total: ₹${grandTotal.toFixed(2)}*\n\n`;
+            if (data.g) msg += `GST No: ${data.g}\n`;
+            if (data.a) msg += `Address: ${data.a}\n`;
+            if (data.m) msg += `📍 Location: ${data.m}\n`;
+            msg += `\n📋 View/Edit Order: ${url}`;
+            
+            navigator.clipboard.writeText(msg);
+        }
+
+        function getCurrentLocation() {
+            if (!navigator.geolocation) return;
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const mapUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+                    document.getElementById('mapLink').value = mapUrl;
+                    updateMapPreview();
+                },
+                (error) => {
+                    console.error('Location error:', error);
+                }
+            );
+        }
+
+        function updateMapPreview() {
+            const mapLink = document.getElementById('mapLink').value;
+            const mapPreview = document.getElementById('mapPreview');
+            const mapFrame = document.getElementById('mapFrame');
+            
+            if (!mapLink) {
+                mapPreview.style.display = 'none';
+                return;
+            }
+            
+            // Convert Google Maps link to embed URL
+            let embedUrl = '';
+            
+            // Handle different Google Maps URL formats
+            if (mapLink.includes('maps.app.goo.gl') || mapLink.includes('goo.gl/maps')) {
+                // Short link - use as is with embed parameter
+                embedUrl = mapLink;
+            } else if (mapLink.includes('@')) {
+                // Extract coordinates from URL like: https://www.google.com/maps/@lat,lng,zoom
+                const match = mapLink.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+                if (match) {
+                    embedUrl = `https://maps.google.com/maps?q=${match[1]},${match[2]}&output=embed`;
+                }
+            } else if (mapLink.includes('place/') || mapLink.includes('search/')) {
+                // Place or search URL
+                const url = new URL(mapLink);
+                embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(url.pathname.split('/').pop())}&output=embed`;
+            }
+            
+            if (embedUrl) {
+                mapFrame.src = embedUrl;
+                mapPreview.style.display = 'block';
+            } else {
+                mapPreview.style.display = 'none';
+            }
+        }
+
+        function resetPage() {
+            window.location.href = window.location.pathname;
+        }
+
+        // Auto-load on page load
+        window.onload = () => {
+            if (window.location.search.includes('d=')) {
+                loadFromURL();
+            } else {
+                // Add one empty product by default
+                addProduct();
+            }
+        };
+    </script>
+</body>
+</html>
