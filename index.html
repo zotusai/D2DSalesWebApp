@@ -163,16 +163,17 @@
         let productCount = 0;
 
         const productCatalog = {
-            'Roll 79mm (55gsm, 60dia)': { price: '33', gst: '18' },
-            'Roll 57mm - 41dia (55gsm)': { price: '10.5', gst: '18' },
-            'Roll 57mm - 31dia (55gsm)': { price: '6.5', gst: '18' },
-            'Custom': { price: '', gst: '18' }
+            'R79-55G-60D': { name: 'Roll 79mm (55gsm, 60dia)', price: '33', gst: '18' },
+            'R79-70G-60D': { name: 'Roll 79mm (70gsm, 60dia)', price: '38', gst: '18' },
+            'R57-55G-41D': { name: 'Roll 57mm - 41dia (55gsm)', price: '10.5', gst: '18' },
+            'R57-55G-31D': { name: 'Roll 57mm - 31dia (55gsm)', price: '6.5', gst: '18' },
+            'CUSTOM': { name: 'Custom', price: '', gst: '18' }
         };
 
         function addProduct(name = '', qty = '', price = '', gst = '18') {
             const id = productCount++;
-            const options = Object.keys(productCatalog).map(p => 
-                `<option value="${p}" ${p === name ? 'selected' : ''}>${p}</option>`
+            const options = Object.entries(productCatalog).map(([key, prod]) => 
+                `<option value="${key}" ${key === name ? 'selected' : ''}>${prod.name}</option>`
             ).join('');
             
             const div = document.createElement('div');
